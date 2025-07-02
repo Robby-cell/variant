@@ -65,6 +65,44 @@ struct IsOneOf<T> {
 
 template <class T, class... Ts>
 constexpr auto IsOneOfV = IsOneOf<T, Ts...>::Value;
+
+template <class T, class... Ts>
+struct IsUnique {
+    static constexpr bool Value = !IsOneOfV<T, Ts...>;
+};
+
+template <class T, class... Ts>
+constexpr auto IsUniqueV = IsUnique<T, Ts...>::Value;
+
+template <class, class...>
+struct AllUnique;
+
+template <class T, class U, class... Ts>
+struct AllUnique<T, U, Ts...> {
+    static constexpr bool Value =
+        IsUniqueV<T, U, Ts...> and AllUnique<U, Ts...>::Value;
+};
+
+template <class T>
+struct AllUnique<T> {
+    static constexpr bool Value = true;
+};
+
+template <class... Ts>
+constexpr auto AllUniqueV = AllUnique<Ts...>::Value;
+
+template <template <class...> class, class...>
+struct IsInstanceOf {
+    static constexpr bool Value = false;
+};
+
+template <template <class...> class T, class... Ts>
+struct IsInstanceOf<T, T<Ts...>> {
+    static constexpr bool Value = true;
+};
+
+template <template <class...> class T, class... Ts>
+constexpr auto IsInstanceOfV = IsInstanceOf<T, Ts...>::Value;
 }  // namespace detail
 
 struct BadVariantAccess : public std::runtime_error {
@@ -77,6 +115,8 @@ template <class... Ts>
 class Variant {
    private:
     static_assert(sizeof...(Ts) > 0, "Variant must have at least one type");
+    static_assert(detail::AllUniqueV<Ts...>,
+                  "All element types must be unique");
 
     static constexpr auto StorageSize = std::max({sizeof(Ts)...});
     static constexpr auto StorageAlign = std::max({alignof(Ts)...});
@@ -216,6 +256,13 @@ class Variant {
         return type_index_ == InvalidIndex;
     }
 
+    template <typename T>
+    constexpr bool HoldsAlternative() const {
+        static_assert(detail::IsOneOfV<T, Ts...>,
+                      "Must be one of the types belonging to the variant");
+        return type_index_ == TypeIndexV<T, Ts...>;
+    }
+
     template <typename T, typename... Args>
     void Emplace(Args &&...args) {
         using Type = T;
@@ -267,7 +314,20 @@ class Variant {
 
 template <typename Visitor, typename V>
 decltype(auto) Visit(Visitor &&visitor, V &&v) {
+    static_assert(
+        detail::IsInstanceOfV<Variant,
+                              std::remove_cv_t<std::remove_reference_t<V>>>,
+        "Must be a variant");
     return std::forward<V>(v).Visit(std::forward<Visitor>(visitor));
+}
+
+template <typename T, typename V>
+decltype(auto) HoldsAlternative(const V &v) {
+    static_assert(
+        detail::IsInstanceOfV<Variant,
+                              std::remove_cv_t<std::remove_reference_t<V>>>,
+        "Must be a variant");
+    return v.template HoldsAlternative<T>();
 }
 
 }  // namespace variant
