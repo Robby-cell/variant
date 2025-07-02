@@ -1,6 +1,7 @@
 #include <ios>
 #include <iostream>
 #include <string>
+#include <utility>
 
 #include "variant/variant.hpp"
 
@@ -25,4 +26,7 @@ int main() {
 
     auto holds_int = HoldsAlternative<int>(v);
     std::cout << "Holds int: " << std::boolalpha << holds_int << '\n';
+
+    auto copy = v;
+    auto moved = std::move(v);
 }
