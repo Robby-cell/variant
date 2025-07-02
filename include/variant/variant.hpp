@@ -1,6 +1,7 @@
 #ifndef VARIANT_VARIANT_HPP
 #define VARIANT_VARIANT_HPP
 
+#include <algorithm>
 #include <cstddef>
 #include <cstdint>
 #include <limits>
@@ -29,12 +30,12 @@ struct AllTheSame {};
 template <class T, class T2, class... Ts>
 struct AllTheSame<T, T2, Ts...> {
     static constexpr bool Value =
-        (std::is_same_v<T, T2> and AllTheSame<T2, Ts...>::Value);
+        (std::is_same<T, T2>::value and AllTheSame<T2, Ts...>::Value);
 };
 
 template <class T, class T2>
 struct AllTheSame<T, T2> {
-    static constexpr bool Value = (std::is_same_v<T, T2>);
+    static constexpr bool Value = (std::is_same<T, T2>::value);
 };
 
 template <class T>
@@ -220,26 +221,21 @@ class Variant {
     template <class T, class... Pack>
     static constexpr auto TypeIndexV = TypeIndex<T, Pack...>::value;
 
-    template <std::size_t Index>
-    void DoDestroyAlternative() {
-        if (type_index_ == Index) {
-            reinterpret_cast<TypeAtIndex<Index> *>(&data_)
-                ->~TypeAtIndex<Index>();
+   private:
+    struct DestroyInPlace {
+        template <class Type>
+        void operator()(Type &value) const {
+            value.~Type();
         }
-    }
+    };
 
-    template <std::size_t... Indexes>
-    void DoDestroyImpl(std::index_sequence<Indexes...>) {
-        using Dummy = int[];
-        (void)Dummy{0, (DoDestroyAlternative<Indexes>(), 0)...};
-        type_index_ = InvalidIndex;
-    }
-
+   public:
     void DoDestroy() {
         if (HasInvalidIndex()) {
             return;
         }
-        DoDestroyImpl(std::make_index_sequence<TypeCount>());
+
+        Visit(DestroyInPlace{});
     }
 
     void throw_if_invalid_index() const {  // NOLINT
@@ -271,7 +267,7 @@ class Variant {
         using Type = T;
         static_assert(detail::IsOneOfV<Type, Ts...>,
                       "Type to be constructed must be in the variant");
-        static_assert(std::is_constructible_v<Type, Args...>,
+        static_assert(std::is_constructible<Type, Args...>::value,
                       "Type must be constructible from the provided args");
 
         DoDestroy();
@@ -318,8 +314,9 @@ class Variant {
 template <typename Visitor, typename V>
 decltype(auto) Visit(Visitor &&visitor, V &&v) {
     static_assert(
-        detail::IsInstanceOfV<Variant,
-                              std::remove_cv_t<std::remove_reference_t<V>>>,
+        detail::IsInstanceOfV<
+            Variant, typename std::remove_cv<
+                         typename std::remove_reference<V>::type>::type>,
         "Must be a variant");
     return std::forward<V>(v).Visit(std::forward<Visitor>(visitor));
 }
@@ -327,8 +324,9 @@ decltype(auto) Visit(Visitor &&visitor, V &&v) {
 template <typename T, typename V>
 decltype(auto) HoldsAlternative(const V &v) {
     static_assert(
-        detail::IsInstanceOfV<Variant,
-                              std::remove_cv_t<std::remove_reference_t<V>>>,
+        detail::IsInstanceOfV<
+            Variant, typename std::remove_cv<
+                         typename std::remove_reference<V>::type>::type>,
         "Must be a variant");
     return v.template HoldsAlternative<T>();
 }

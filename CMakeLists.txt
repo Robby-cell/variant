@@ -7,7 +7,7 @@
 cmake_minimum_required(VERSION 3.16)
 
 project(variant
-    VERSION 1.0.0
+    VERSION 0.1.0
     DESCRIPTION "A custom C++ variant implementation"
     LANGUAGES CXX)
 
@@ -38,9 +38,9 @@ target_include_directories(variant INTERFACE
     $<INSTALL_INTERFACE:include> # Path relative to CMAKE_INSTALL_PREFIX
 )
 
-# Specify that any target linking against 'variant' must also use C++17.
+# Specify that any target linking against 'variant' must also use C++14.
 # This is a "usage requirement".
-target_compile_features(variant INTERFACE cxx_std_17)
+target_compile_features(variant INTERFACE cxx_std_14)
 
 #-----------------------------------------------------------------------------
 # Testing (gtest)

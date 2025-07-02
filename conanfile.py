@@ -7,7 +7,7 @@ DEFAULT_GTEST_VERSION = "1.16.0"
 
 class MusicPlayerRecipe(ConanFile):
     name = "variant"
-    version = "0.1"
+    version = "0.1.0"
     package_type = "library"
 
     options = {
