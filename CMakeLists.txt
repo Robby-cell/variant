@@ -14,18 +14,12 @@ project(variant
 #-----------------------------------------------------------------------------
 # Options
 #-----------------------------------------------------------------------------
-option(VARIANT_BUILD_EXAMPLES "Build example programs." ON)
-option(VARIANT_BUILD_TESTS "Build the tests for this project." ON)
+option(VARIANT_BUILD_EXAMPLES "Build example programs." OFF)
+option(VARIANT_BUILD_TESTS "Build the tests for this project." OFF)
 
 #-----------------------------------------------------------------------------
 # Project Configuration
 #-----------------------------------------------------------------------------
-
-# Our library requires C++17 features (e.g., if constexpr).
-# We set this as a global property for our project.
-set(CMAKE_CXX_STANDARD 17)
-set(CMAKE_CXX_STANDARD_REQUIRED ON)
-set(CMAKE_CXX_EXTENSIONS OFF)
 
 #-----------------------------------------------------------------------------
 # Library Target
