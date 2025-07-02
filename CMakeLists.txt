@@ -49,10 +49,7 @@ target_include_directories(variant INTERFACE
 target_compile_features(variant INTERFACE cxx_std_17)
 
 #-----------------------------------------------------------------------------
-# Testing (using doctest)
-#
-# We use FetchContent to download the testing framework at configure time.
-# This avoids needing git submodules or asking the user to install it.
+# Testing (gtest)
 #-----------------------------------------------------------------------------
 if(VARIANT_BUILD_TESTS)
     add_subdirectory(tests)
@@ -64,13 +61,6 @@ endif()
 if(VARIANT_BUILD_EXAMPLES)
     add_subdirectory(examples)
 endif()
-
-#-----------------------------------------------------------------------------
-# Installation and Exporting
-#
-# This section enables 'make install' and generates the necessary files
-# for other CMake projects to use `find_package(variant)`.
-#-----------------------------------------------------------------------------
 
 # Use standard installation directory variables (e.g., CMAKE_INSTALL_INCLUDEDIR)
 include(GNUInstallDirs)
