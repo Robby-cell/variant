@@ -232,6 +232,7 @@ class Variant {
     void DoDestroyImpl(std::index_sequence<Indexes...>) {
         using Dummy = int[];
         (void)Dummy{0, (DoDestroyAlternative<Indexes>(), 0)...};
+        type_index_ = InvalidIndex;
     }
 
     void DoDestroy() {
@@ -251,6 +252,8 @@ class Variant {
     Variant() : type_index_(InvalidIndex) {}
 
     ~Variant() { DoDestroy(); }
+
+    void Reset() { DoDestroy(); }
 
     constexpr bool HasInvalidIndex() const {
         return type_index_ == InvalidIndex;
