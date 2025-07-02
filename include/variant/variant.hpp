@@ -268,13 +268,21 @@ class Variant {
         return *this;
     }
 
+   private:
+    struct CopyVisitor {
+        Variant &variant;
+        template <typename Type>
+        void operator()(const Type &value) noexcept {
+            variant.Emplace<typename std::remove_cv<
+                typename std::remove_reference<Type>::type>::type>(
+                std::forward<Type>(value));
+        }
+    };
+
+   public:
     void Copy(const Variant &that) {
         Reset();
-        that.Visit([this](const auto &value) {
-            using ValueType = typename std::remove_cv<
-                typename std::remove_reference<decltype(value)>::type>::type;
-            Emplace<ValueType>(value);
-        });
+        that.Visit(CopyVisitor{*this});
     }
 
    private:
@@ -284,7 +292,7 @@ class Variant {
         void operator()(Type &&value) noexcept {
             variant.Emplace<typename std::remove_cv<
                 typename std::remove_reference<Type>::type>::type>(
-                std::forward<Type>(value));
+                std::move(value));
         }
     };
 
