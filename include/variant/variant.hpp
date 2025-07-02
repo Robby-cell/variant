@@ -249,6 +249,52 @@ class Variant {
 
     ~Variant() { DoDestroy(); }
 
+    Variant(const Variant &that) : type_index_(InvalidIndex) { Copy(that); }
+    Variant &operator=(const Variant &that) {
+        if (this == std::addressof(that)) {
+            return *this;
+        }
+        Copy(that);
+        return *this;
+    }
+    Variant(Variant &&that) noexcept : type_index_(InvalidIndex) {
+        Move(std::move(that));
+    }
+    Variant &operator=(Variant &&that) noexcept {
+        if (this == std::addressof(that)) {
+            return *this;
+        }
+        Move(std::move(that));
+        return *this;
+    }
+
+    void Copy(const Variant &that) {
+        Reset();
+        that.Visit([this](const auto &value) {
+            using ValueType = typename std::remove_cv<
+                typename std::remove_reference<decltype(value)>::type>::type;
+            Emplace<ValueType>(value);
+        });
+    }
+
+   private:
+    struct MoveVisitor {
+        Variant &variant;
+        template <typename Type>
+        void operator()(Type &&value) noexcept {
+            variant.Emplace<typename std::remove_cv<
+                typename std::remove_reference<Type>::type>::type>(
+                std::forward<Type>(value));
+        }
+    };
+
+   public:
+    void Move(Variant &&that) noexcept {
+        Reset();
+        that.Visit(MoveVisitor{*this});
+        that.type_index_ = InvalidIndex;
+    }
+
     void Reset() { DoDestroy(); }
 
     constexpr bool HasInvalidIndex() const {
