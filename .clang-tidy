@@ -1,0 +1,41 @@
+---
+Checks: '-*,readability-identifier-naming,google-*'
+
+CheckOptions:
+  # ----------------------------------------------------------------------------
+  # Configuration for the 'readability-identifier-naming' check.
+  # We are setting up rules to match the Google C++ Style Guide.
+  # See: https://google.github.io/styleguide/cppguide.html#Naming
+  # ----------------------------------------------------------------------------
+  readability-identifier-naming.ClassCase: CamelCase
+  readability-identifier-naming.StructCase: CamelCase
+  readability-identifier-naming.EnumCase: CamelCase
+  readability-identifier-naming.UnionCase: CamelCase
+  readability-identifier-naming.TemplateParameterCase: CamelCase
+  readability-identifier-naming.TypeAliasCase: CamelCase # For 'using' and 'typedef'
+
+  readability-identifier-naming.FunctionCase: CamelCase
+  readability-identifier-naming.MethodCase: CamelCase
+  
+  # Enum constants are k diikuti oleh UpperCamelCase.
+  readability-identifier-naming.EnumConstantCase: CamelCase
+
+  # Constants (const, constexpr) are k followed by UpperCamelCase.
+  readability-identifier-naming.ConstantCase: lower_case
+  readability-identifier-naming.ConstexprVariableCase: CamelCase
+  
+  # Member variables are lower_snake_case with a trailing underscore.
+  readability-identifier-naming.PrivateMemberCase: lower_case
+  readability-identifier-naming.PrivateMemberSuffix: '_'
+  readability-identifier-naming.ProtectedMemberCase: lower_case
+  readability-identifier-naming.ProtectedMemberSuffix: '_'
+  # Public members don't have a trailing underscore.
+  readability-identifier-naming.PublicMemberCase: lower_case
+
+  # Local variables and parameters are lower_snake_case.
+  readability-identifier-naming.LocalVariableCase: lower_case
+  readability-identifier-naming.ParameterCase: lower_case
+
+  readability-identifier-naming.GlobalVariableCase: lower_case
+  readability-identifier-naming.GlobalVariablePrefix: 'g_'
+...
