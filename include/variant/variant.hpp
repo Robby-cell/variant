@@ -245,11 +245,12 @@ class Variant {
     }
 
    public:
-    Variant() : type_index_(InvalidIndex) {}
+    Variant() = default;
 
     ~Variant() { DoDestroy(); }
 
-    Variant(const Variant &that) : type_index_(InvalidIndex) { Copy(that); }
+    Variant(const Variant &that) { Copy(that); }
+
     Variant &operator=(const Variant &that) {
         if (this == std::addressof(that)) {
             return *this;
@@ -257,9 +258,8 @@ class Variant {
         Copy(that);
         return *this;
     }
-    Variant(Variant &&that) noexcept : type_index_(InvalidIndex) {
-        Move(std::move(that));
-    }
+    Variant(Variant &&that) noexcept { Move(std::move(that)); }
+
     Variant &operator=(Variant &&that) noexcept {
         if (this == std::addressof(that)) {
             return *this;
@@ -354,7 +354,7 @@ class Variant {
 
    private:
     alignas(StorageAlign) Byte data_[StorageSize];
-    StorageIndexType type_index_;
+    StorageIndexType type_index_ = InvalidIndex;
 };
 
 template <typename Visitor, typename V>
