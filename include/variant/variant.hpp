@@ -104,6 +104,12 @@ struct IsInstanceOf<T, T<Ts...>> {
 
 template <template <class...> class T, class... Ts>
 constexpr auto IsInstanceOfV = IsInstanceOf<T, Ts...>::Value;
+
+template <typename T>
+struct RemoveCVRef {
+    using Type =
+        typename std::remove_cv<typename std::remove_reference<T>::type>::type;
+};
 }  // namespace detail
 
 struct BadVariantAccess : public std::runtime_error {
@@ -249,6 +255,16 @@ class Variant {
 
     ~Variant() { DoDestroy(); }
 
+    template <typename T>
+    explicit Variant(T &&value) {
+        Emplace<typename detail::RemoveCVRef<T>::Type>(std::forward<T>(value));
+    }
+
+    template <typename T>
+    explicit Variant(const T &value) {
+        Emplace<typename detail::RemoveCVRef<T>::Type>(value);
+    }
+
     Variant(const Variant &that) { Copy(that); }
 
     Variant &operator=(const Variant &that) {
@@ -273,9 +289,7 @@ class Variant {
         Variant &variant;
         template <typename Type>
         void operator()(const Type &value) noexcept {
-            variant.Emplace<typename std::remove_cv<
-                typename std::remove_reference<Type>::type>::type>(
-                std::forward<Type>(value));
+            variant.Emplace<typename detail::RemoveCVRef<Type>::Type>(value);
         }
     };
 
@@ -290,8 +304,7 @@ class Variant {
         Variant &variant;
         template <typename Type>
         void operator()(Type &&value) noexcept {
-            variant.Emplace<typename std::remove_cv<
-                typename std::remove_reference<Type>::type>::type>(
+            variant.Emplace<typename detail::RemoveCVRef<Type>::Type>(
                 std::move(value));
         }
     };
@@ -368,9 +381,7 @@ class Variant {
 template <typename Visitor, typename V>
 decltype(auto) Visit(Visitor &&visitor, V &&v) {
     static_assert(
-        detail::IsInstanceOfV<
-            Variant, typename std::remove_cv<
-                         typename std::remove_reference<V>::type>::type>,
+        detail::IsInstanceOfV<Variant, typename detail::RemoveCVRef<V>::Type>,
         "Must be a variant");
     return std::forward<V>(v).Visit(std::forward<Visitor>(visitor));
 }
@@ -378,9 +389,7 @@ decltype(auto) Visit(Visitor &&visitor, V &&v) {
 template <typename T, typename V>
 decltype(auto) HoldsAlternative(const V &v) {
     static_assert(
-        detail::IsInstanceOfV<
-            Variant, typename std::remove_cv<
-                         typename std::remove_reference<V>::type>::type>,
+        detail::IsInstanceOfV<Variant, typename detail::RemoveCVRef<V>::Type>,
         "Must be a variant");
     return v.template HoldsAlternative<T>();
 }
