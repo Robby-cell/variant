@@ -4,8 +4,6 @@
 
 #include <string>
 
-// NOLINTBEGIN
-
 TEST(VariantTest, DefaultConstruction) {
     variant::Variant<int, std::string> v;
     EXPECT_TRUE(v.HasInvalidIndex());
@@ -78,7 +76,7 @@ TEST(VariantTest, Monostate) {
 }
 
 struct NonDefaultConstructible {
-    NonDefaultConstructible(int) {}
+    explicit NonDefaultConstructible(int) {}
 };
 
 TEST(VariantTest, NonDefaultConstructible) {
@@ -88,5 +86,3 @@ TEST(VariantTest, NonDefaultConstructible) {
     v.Emplace<NonDefaultConstructible>(1);
     EXPECT_TRUE(v.HoldsAlternative<NonDefaultConstructible>());
 }
-
-// NOLINTEND
