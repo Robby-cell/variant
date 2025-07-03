@@ -3,7 +3,9 @@ enable_testing()
 find_package(gtest CONFIG REQUIRED)
 
 add_executable(tests
-  tests.cc)
+  tests.cc
+  variant_test.cc
+  visitor_test.cc)
 
 target_link_libraries(tests PRIVATE GTest::gtest_main)
 target_link_libraries(tests PRIVATE variant)
