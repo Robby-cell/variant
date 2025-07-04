@@ -1,4 +1,4 @@
-from conan import ConanFile
+from conan import ConanFile, tools
 from conan.tools.cmake import CMakeToolchain, CMake, cmake_layout, CMakeDeps
 from conan.tools.env import VirtualRunEnv
 from conan.tools.build import can_run
@@ -69,3 +69,14 @@ class MusicPlayerRecipe(ConanFile):
         cmake = CMake(self)
         cmake.configure()
         cmake.build()
+
+    def package(self):
+        self.copy("LICENSE", dst="licenses")
+        self.copy("*.hpp", dst="include", src=".")
+
+    def package_info(self):
+        if self.settings.os == "Linux":
+            self.cpp_info.libs = ["-Wl,--start-group"]
+        self.cpp_info.libs.extend(tools.collect_libs(self))
+        if self.settings.os == "Linux":
+            self.cpp_info.libs.extend(["-Wl,--end-group"])
