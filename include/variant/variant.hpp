@@ -12,6 +12,9 @@
 
 namespace variant {
 
+template <class... Ts>
+class Variant;
+
 namespace detail {
 template <std::size_t Count>
 struct StorageIndex {
@@ -25,7 +28,7 @@ struct StorageIndex {
 };
 
 template <class T, class... Ts>
-struct AllTheSame {};
+struct AllTheSame;
 
 template <class T, class T2, class... Ts>
 struct AllTheSame<T, T2, Ts...> {
@@ -110,6 +113,31 @@ struct RemoveCVRef {
     using Type =
         typename std::remove_cv<typename std::remove_reference<T>::type>::type;
 };
+
+template <typename T, typename... Ts>
+struct IndexOfType;
+
+template <typename T, typename... Ts>
+struct IndexOfType<T, T, Ts...> {
+    static constexpr std::size_t Value = 0;
+};
+
+template <typename T, typename U, typename... Ts>
+struct IndexOfType<T, U, Ts...> {
+    static constexpr std::size_t Value = 1 + IndexOfType<T, Ts...>::Value;
+};
+
+template <typename T, typename... Ts>
+constexpr auto IndexOfTypeV = IndexOfType<T, Ts...>::Value;
+
+template <typename MaybeVariant>
+static constexpr auto IsVariantV =
+    IsInstanceOfV<Variant, typename RemoveCVRef<MaybeVariant>::Type>;
+
+template <typename V>
+struct IsVariant {
+    static constexpr auto Value = IsVariantV<V>;
+};
 }  // namespace detail
 
 struct BadVariantAccess : public std::runtime_error {
@@ -138,7 +166,7 @@ class Variant {
     using TypeAtIndex =
         typename std::tuple_element<Index, std::tuple<Ts...>>::type;
 
-   public:
+   private:
     template <std::size_t Index>
     TypeAtIndex<Index> &Get() & {
         // Note: No type_index_ check here. The caller (Visit) is responsible.
@@ -158,6 +186,47 @@ class Variant {
     template <std::size_t Index>
     const TypeAtIndex<Index> &&Get() const && {
         return std::move(*reinterpret_cast<const TypeAtIndex<Index> *>(&data_));
+    }
+
+    template <typename T>
+    void EnsureHoldsAlternative() const {
+        if (type_index_ != detail::IndexOfTypeV<T, Ts...>) {
+            throw BadVariantAccess("Unexpected alternative active");
+        }
+    }
+
+    template <std::size_t I>
+    void EnsureHoldsAlternative() const {
+        if (type_index_ == I) {
+            throw BadVariantAccess("Unexpected alternative active");
+        }
+    }
+
+   public:
+    template <typename T>
+    TypeAtIndex<detail::IndexOfTypeV<T, Ts...>> &Get() & {
+        EnsureHoldsAlternative<T>();
+        return Get<detail::IndexOfTypeV<T, Ts...>>();
+    }
+
+    template <typename T>
+    const TypeAtIndex<detail::IndexOfTypeV<T, Ts...>> &Get() const & {
+        EnsureHoldsAlternative<T>();
+        return Get<detail::IndexOfTypeV<T, Ts...>>();
+    }
+
+    template <typename T>
+    TypeAtIndex<detail::IndexOfTypeV<T, Ts...>> &&Get() && {
+        EnsureHoldsAlternative<T>();
+        return static_cast<Variant &&>(*this)
+            .Get<detail::IndexOfTypeV<T, Ts...>>();
+    }
+
+    template <typename T>
+    const TypeAtIndex<detail::IndexOfTypeV<T, Ts...>> &&Get() && {
+        EnsureHoldsAlternative<T>();
+        return static_cast<const Variant &&>(*this)
+            .Get<detail::IndexOfTypeV<T, Ts...>>();
     }
 
    private:
@@ -235,7 +304,7 @@ class Variant {
         }
     };
 
-   public:
+   private:
     void DoDestroy() {
         if (HasInvalidIndex()) {
             return;
@@ -274,13 +343,13 @@ class Variant {
         Copy(that);
         return *this;
     }
-    Variant(Variant &&that) noexcept { Move(std::move(that)); }
+    Variant(Variant &&that) noexcept { Take(std::move(that)); }
 
     Variant &operator=(Variant &&that) noexcept {
         if (this == std::addressof(that)) {
             return *this;
         }
-        Move(std::move(that));
+        Take(std::move(that));
         return *this;
     }
 
@@ -310,7 +379,7 @@ class Variant {
     };
 
    public:
-    void Move(Variant &&that) noexcept {
+    void Take(Variant &&that) noexcept {
         Reset();
         that.Visit(MoveVisitor{*this});
         that.type_index_ = InvalidIndex;
@@ -380,18 +449,20 @@ class Variant {
 
 template <typename Visitor, typename V>
 decltype(auto) Visit(Visitor &&visitor, V &&v) {
-    static_assert(
-        detail::IsInstanceOfV<Variant, typename detail::RemoveCVRef<V>::Type>,
-        "Must be a variant");
+    static_assert(detail::IsVariantV<V>, "Must be a variant");
     return std::forward<V>(v).Visit(std::forward<Visitor>(visitor));
 }
 
 template <typename T, typename V>
 decltype(auto) HoldsAlternative(const V &v) {
-    static_assert(
-        detail::IsInstanceOfV<Variant, typename detail::RemoveCVRef<V>::Type>,
-        "Must be a variant");
+    static_assert(detail::IsVariantV<V>, "Must be a variant");
     return v.template HoldsAlternative<T>();
+}
+
+template <typename T, typename V>
+decltype(auto) Get(V &&v) {
+    static_assert(detail::IsVariantV<V>, "Must be a variant");
+    return std::forward<V>(v).template Get<T>();
 }
 
 }  // namespace variant
