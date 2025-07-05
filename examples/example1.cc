@@ -29,4 +29,7 @@ int main() {
 
     auto copy = v;
     auto moved = std::move(v);
+
+    auto definitely_an_int = copy.Get<int>();
+    std::cout << "The int held by the variant: " << definitely_an_int << '\n';
 }
