@@ -21,15 +21,20 @@ int main() {
     using variant::HoldsAlternative;
     using variant::Visit;
 
-    auto str = Visit(Visitor{}, v);
+    const auto str = Visit(Visitor{}, v);
     std::cout << "Variant to string = " << str << '\n';
 
-    auto holds_int = HoldsAlternative<int>(v);
+    const auto holds_int = HoldsAlternative<int>(v);
     std::cout << "Holds int: " << std::boolalpha << holds_int << '\n';
 
-    auto copy = v;
-    auto moved = std::move(v);
+    const auto copy = v;
+    const auto moved = std::move(v);
 
-    auto definitely_an_int = copy.Get<int>();
-    std::cout << "The int held by the variant: " << definitely_an_int << '\n';
+    const auto definitely_an_int = copy.Get<int>();
+    std::cout << "The int held by the copied variant: " << definitely_an_int
+              << '\n';
+
+    const auto definitely_an_int_also = moved.Get<int>();
+    std::cout << "The int held by the moved variant: " << definitely_an_int_also
+              << '\n';
 }

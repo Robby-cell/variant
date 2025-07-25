@@ -19,11 +19,11 @@ namespace detail {
 template <std::size_t Count>
 struct StorageIndex {
     using Type = std::conditional_t<
-        Count <= std::numeric_limits<std::uint8_t>::max(), std::uint8_t,
+        Count <= (std::numeric_limits<std::uint8_t>::max)(), std::uint8_t,
         std::conditional_t<
-            Count <= std::numeric_limits<std::uint16_t>::max(), std::uint16_t,
+            Count <= (std::numeric_limits<std::uint16_t>::max)(), std::uint16_t,
             std::conditional_t<Count <=
-                                   std::numeric_limits<std::uint32_t>::max(),
+                                   (std::numeric_limits<std::uint32_t>::max)(),
                                std::uint32_t, std::uint64_t>>>;
 };
 
@@ -153,12 +153,14 @@ class Variant {
     static_assert(detail::AllUniqueV<Ts...>,
                   "All element types must be unique");
 
-    static constexpr auto StorageSize = std::max({sizeof(Ts)...});
-    static constexpr auto StorageAlign = std::max({alignof(Ts)...});
+    static constexpr auto StorageSize = (std::max)({sizeof(Ts)...});
+    static constexpr auto StorageAlign = (std::max)({alignof(Ts)...});
     static constexpr auto TypeCount = sizeof...(Ts);
 
     enum struct Byte : std::uint8_t {};
-    using StorageIndexType = typename detail::StorageIndex<TypeCount>::Type;
+
+    // Must add an additional 'type' to represent an invalid index
+    using StorageIndexType = typename detail::StorageIndex<TypeCount + 1>::Type;
 
     static constexpr auto InvalidIndex = static_cast<StorageIndexType>(-1);
 
@@ -197,7 +199,7 @@ class Variant {
 
     template <std::size_t I>
     void EnsureHoldsAlternative() const {
-        if (type_index_ == I) {
+        if (type_index_ != I) {
             throw BadVariantAccess("Unexpected alternative active");
         }
     }
@@ -245,11 +247,12 @@ class Variant {
     struct VisitImplStruct {
         static decltype(auto) DoVisit(Fn &&fn, Self &&self) {
             using VisitFuncPtr = ReturnType (*)(Fn &&, Self &&);
-            VisitFuncPtr visit_table[] = {+[](Fn &&f, Self &&s) -> ReturnType {
-                constexpr std::size_t I = TypeIndexV<Ts, Ts...>;
-                return std::forward<Fn>(f)(
-                    std::forward<Self>(s).template Get<I>());
-            }...};
+            static const VisitFuncPtr visit_table[] = {
+                +[](Fn &&f, Self &&s) -> ReturnType {
+                    static constexpr std::size_t I = TypeIndexV<Ts, Ts...>;
+                    return std::forward<Fn>(f)(
+                        std::forward<Self>(s).template Get<I>());
+                }...};
             return visit_table[self.type_index_](std::forward<Fn>(fn),
                                                  std::forward<Self>(self));
         }
@@ -259,13 +262,10 @@ class Variant {
     struct VisitImplStruct<void, Fn, Self> {
         static decltype(auto) DoVisit(Fn &&fn, Self &&self) {
             using VisitFuncPtr = void (*)(Fn &&, Self &&);
-            VisitFuncPtr visit_table[] = {
-                // The lambda gets its own index `I` via a template parameter.
-                +[](Fn &&f, Self &&s) {
-                    constexpr std::size_t I = TypeIndexV<Ts, Ts...>;
-                    std::forward<Fn>(f)(
-                        std::forward<Self>(s).template Get<I>());
-                }...};
+            static const VisitFuncPtr visit_table[] = {+[](Fn &&f, Self &&s) {
+                static constexpr std::size_t I = TypeIndexV<Ts, Ts...>;
+                std::forward<Fn>(f)(std::forward<Self>(s).template Get<I>());
+            }...};
             visit_table[self.type_index_](std::forward<Fn>(fn),
                                           std::forward<Self>(self));
         }
@@ -311,6 +311,7 @@ class Variant {
         }
 
         Visit(DestroyInPlace{});
+        type_index_ = InvalidIndex;
     }
 
     void throw_if_invalid_index() const {  // NOLINT
@@ -381,8 +382,8 @@ class Variant {
    public:
     void Take(Variant &&that) noexcept {
         Reset();
-        that.Visit(MoveVisitor{*this});
-        that.type_index_ = InvalidIndex;
+        std::forward<Variant>(that).Visit(MoveVisitor{*this});
+        that.Reset();
     }
 
     void Reset() { DoDestroy(); }
