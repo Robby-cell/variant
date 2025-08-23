@@ -225,7 +225,7 @@ class Variant {
     }
 
     template <typename T>
-    const TypeAtIndex<detail::IndexOfTypeV<T, Ts...>> &&Get() && {
+    const TypeAtIndex<detail::IndexOfTypeV<T, Ts...>> &&Get() const && {
         EnsureHoldsAlternative<T>();
         return static_cast<const Variant &&>(*this)
             .Get<detail::IndexOfTypeV<T, Ts...>>();
