@@ -138,6 +138,46 @@ template <typename V>
 struct IsVariant {
     static constexpr auto Value = IsVariantV<V>;
 };
+
+template <typename T, typename... Pack>
+struct TypeIndex;
+
+template <typename T, typename... Rest>
+struct TypeIndex<T, T, Rest...> : std::integral_constant<std::size_t, 0> {};
+
+template <typename T, typename U, typename... Rest>
+struct TypeIndex<T, U, Rest...>
+    : std::integral_constant<std::size_t, 1 + TypeIndex<T, Rest...>::value> {};
+
+template <class T, class... Pack>
+constexpr auto TypeIndexV = TypeIndex<T, Pack...>::value;
+
+template <class ReturnType, class Fn, class Self, class... Ts>
+struct VisitImplStruct {
+    static decltype(auto) DoVisit(Fn&& fn, Self&& self) {
+        using VisitFuncPtr = ReturnType (*)(Fn&&, Self&&);
+        static const VisitFuncPtr visit_table[] = {+[](Fn&& f,
+                                                       Self&& s) -> ReturnType {
+            static constexpr std::size_t I = TypeIndexV<Ts, Ts...>;
+            return std::forward<Fn>(f)(std::forward<Self>(s).template Get<I>());
+        }...};
+        return visit_table[self.Index()](std::forward<Fn>(fn),
+                                         std::forward<Self>(self));
+    }
+};
+
+template <class Fn, class Self, class... Ts>
+struct VisitImplStruct<void, Fn, Self, Ts...> {
+    static decltype(auto) DoVisit(Fn&& fn, Self&& self) {
+        using VisitFuncPtr = void (*)(Fn&&, Self&&);
+        static const VisitFuncPtr visit_table[] = {+[](Fn&& f, Self&& s) {
+            static constexpr std::size_t I = TypeIndexV<Ts, Ts...>;
+            std::forward<Fn>(f)(std::forward<Self>(s).template Get<I>());
+        }...};
+        visit_table[self.Index()](std::forward<Fn>(fn),
+                                  std::forward<Self>(self));
+    }
+};
 }  // namespace detail
 
 struct BadVariantAccess : public std::runtime_error {
@@ -168,28 +208,29 @@ class Variant {
     using TypeAtIndex =
         typename std::tuple_element<Index, std::tuple<Ts...>>::type;
 
-   private:
+   public:
     template <std::size_t Index>
-    TypeAtIndex<Index> &Get() & {
+    TypeAtIndex<Index>& Get() & {
         // Note: No type_index_ check here. The caller (Visit) is responsible.
-        return *reinterpret_cast<TypeAtIndex<Index> *>(&data_);
+        return *reinterpret_cast<TypeAtIndex<Index>*>(&data_);
     }
 
     template <std::size_t Index>
-    const TypeAtIndex<Index> &Get() const & {
-        return *reinterpret_cast<const TypeAtIndex<Index> *>(&data_);
+    const TypeAtIndex<Index>& Get() const& {
+        return *reinterpret_cast<const TypeAtIndex<Index>*>(&data_);
     }
 
     template <std::size_t Index>
-    TypeAtIndex<Index> &&Get() && {
-        return std::move(*reinterpret_cast<TypeAtIndex<Index> *>(&data_));
+    TypeAtIndex<Index>&& Get() && {
+        return std::move(*reinterpret_cast<TypeAtIndex<Index>*>(&data_));
     }
 
     template <std::size_t Index>
-    const TypeAtIndex<Index> &&Get() const && {
-        return std::move(*reinterpret_cast<const TypeAtIndex<Index> *>(&data_));
+    const TypeAtIndex<Index>&& Get() const&& {
+        return std::move(*reinterpret_cast<const TypeAtIndex<Index>*>(&data_));
     }
 
+   private:
     template <typename T>
     void EnsureHoldsAlternative() const {
         if (type_index_ != detail::IndexOfTypeV<T, Ts...>) {
@@ -206,28 +247,28 @@ class Variant {
 
    public:
     template <typename T>
-    TypeAtIndex<detail::IndexOfTypeV<T, Ts...>> &Get() & {
+    TypeAtIndex<detail::IndexOfTypeV<T, Ts...>>& Get() & {
         EnsureHoldsAlternative<T>();
         return Get<detail::IndexOfTypeV<T, Ts...>>();
     }
 
     template <typename T>
-    const TypeAtIndex<detail::IndexOfTypeV<T, Ts...>> &Get() const & {
+    const TypeAtIndex<detail::IndexOfTypeV<T, Ts...>>& Get() const& {
         EnsureHoldsAlternative<T>();
         return Get<detail::IndexOfTypeV<T, Ts...>>();
     }
 
     template <typename T>
-    TypeAtIndex<detail::IndexOfTypeV<T, Ts...>> &&Get() && {
+    TypeAtIndex<detail::IndexOfTypeV<T, Ts...>>&& Get() && {
         EnsureHoldsAlternative<T>();
-        return static_cast<Variant &&>(*this)
+        return static_cast<Variant&&>(*this)
             .Get<detail::IndexOfTypeV<T, Ts...>>();
     }
 
     template <typename T>
-    const TypeAtIndex<detail::IndexOfTypeV<T, Ts...>> &&Get() const && {
+    const TypeAtIndex<detail::IndexOfTypeV<T, Ts...>>&& Get() const&& {
         EnsureHoldsAlternative<T>();
-        return static_cast<const Variant &&>(*this)
+        return static_cast<const Variant&&>(*this)
             .Get<detail::IndexOfTypeV<T, Ts...>>();
     }
 
@@ -243,63 +284,21 @@ class Variant {
             "All return types must be the same");
     }
 
-    template <class ReturnType, class Fn, class Self>
-    struct VisitImplStruct {
-        static decltype(auto) DoVisit(Fn &&fn, Self &&self) {
-            using VisitFuncPtr = ReturnType (*)(Fn &&, Self &&);
-            static const VisitFuncPtr visit_table[] = {
-                +[](Fn &&f, Self &&s) -> ReturnType {
-                    static constexpr std::size_t I = TypeIndexV<Ts, Ts...>;
-                    return std::forward<Fn>(f)(
-                        std::forward<Self>(s).template Get<I>());
-                }...};
-            return visit_table[self.type_index_](std::forward<Fn>(fn),
-                                                 std::forward<Self>(self));
-        }
-    };
-
-    template <class Fn, class Self>
-    struct VisitImplStruct<void, Fn, Self> {
-        static decltype(auto) DoVisit(Fn &&fn, Self &&self) {
-            using VisitFuncPtr = void (*)(Fn &&, Self &&);
-            static const VisitFuncPtr visit_table[] = {+[](Fn &&f, Self &&s) {
-                static constexpr std::size_t I = TypeIndexV<Ts, Ts...>;
-                std::forward<Fn>(f)(std::forward<Self>(s).template Get<I>());
-            }...};
-            visit_table[self.type_index_](std::forward<Fn>(fn),
-                                          std::forward<Self>(self));
-        }
-    };
-
     template <typename Fn, class Self>
-    static decltype(auto) DoVisitImpl(Fn &&fn, Self &&self) {
+    static decltype(auto) DoVisitImpl(Fn&& fn, Self&& self) {
         using ReturnType = decltype(std::forward<Fn>(fn)(
             std::forward<Self>(self).template Get<0>()));
         DummySameReturnTypes<Fn, Self, ReturnType>(
             std::make_index_sequence<TypeCount>());
 
-        return VisitImplStruct<ReturnType, Fn, Self>::DoVisit(
+        return detail::VisitImplStruct<ReturnType, Fn, Self, Ts...>::DoVisit(
             std::forward<Fn>(fn), std::forward<Self>(self));
     }
-
-    template <typename T, typename... Pack>
-    struct TypeIndex;
-
-    template <typename T, typename... Rest>
-    struct TypeIndex<T, T, Rest...> : std::integral_constant<std::size_t, 0> {};
-
-    template <typename T, typename U, typename... Rest>
-    struct TypeIndex<T, U, Rest...>
-        : std::integral_constant<std::size_t,
-                                 1 + TypeIndex<T, Rest...>::value> {};
-
-    template <class T, class... Pack>
-    static constexpr auto TypeIndexV = TypeIndex<T, Pack...>::value;
 
    private:
     struct DestroyInPlace {
         template <class Type>
-        void operator()(Type &value) const {
+        void operator()(Type& value) const {
             value.~Type();
         }
     };
@@ -326,27 +325,22 @@ class Variant {
     ~Variant() { DoDestroy(); }
 
     template <typename T>
-    explicit Variant(T &&value) {
+    explicit Variant(T&& value) {
         Emplace<typename detail::RemoveCVRef<T>::Type>(std::forward<T>(value));
     }
 
-    template <typename T>
-    explicit Variant(const T &value) {
-        Emplace<typename detail::RemoveCVRef<T>::Type>(value);
-    }
+    Variant(const Variant& that) { Copy(that); }
 
-    Variant(const Variant &that) { Copy(that); }
-
-    Variant &operator=(const Variant &that) {
+    Variant& operator=(const Variant& that) {
         if (this == std::addressof(that)) {
             return *this;
         }
         Copy(that);
         return *this;
     }
-    Variant(Variant &&that) noexcept { Take(std::move(that)); }
+    Variant(Variant&& that) noexcept { Take(std::move(that)); }
 
-    Variant &operator=(Variant &&that) noexcept {
+    Variant& operator=(Variant&& that) noexcept {
         if (this == std::addressof(that)) {
             return *this;
         }
@@ -356,31 +350,31 @@ class Variant {
 
    private:
     struct CopyVisitor {
-        Variant &variant;
+        Variant& variant;
         template <typename Type>
-        void operator()(const Type &value) noexcept {
+        void operator()(const Type& value) noexcept {
             variant.Emplace<typename detail::RemoveCVRef<Type>::Type>(value);
         }
     };
 
    public:
-    void Copy(const Variant &that) {
+    void Copy(const Variant& that) {
         Reset();
         that.Visit(CopyVisitor{*this});
     }
 
    private:
     struct MoveVisitor {
-        Variant &variant;
+        Variant& variant;
         template <typename Type>
-        void operator()(Type &&value) noexcept {
+        void operator()(Type&& value) noexcept {
             variant.Emplace<typename detail::RemoveCVRef<Type>::Type>(
                 std::move(value));
         }
     };
 
    public:
-    void Take(Variant &&that) noexcept {
+    void Take(Variant&& that) noexcept {
         Reset();
         std::forward<Variant>(that).Visit(MoveVisitor{*this});
         that.Reset();
@@ -396,11 +390,11 @@ class Variant {
     constexpr bool HoldsAlternative() const {
         static_assert(detail::IsOneOfV<T, Ts...>,
                       "Must be one of the types belonging to the variant");
-        return type_index_ == TypeIndexV<T, Ts...>;
+        return type_index_ == detail::TypeIndexV<T, Ts...>;
     }
 
     template <typename T, typename... Args>
-    void Emplace(Args &&...args) {
+    void Emplace(Args&&... args) {
         using Type = T;
         static_assert(detail::IsOneOfV<Type, Ts...>,
                       "Type to be constructed must be in the variant");
@@ -408,30 +402,31 @@ class Variant {
                       "Type must be constructible from the provided args");
 
         DoDestroy();
-        new (reinterpret_cast<Type *>(data_)) Type(std::forward<Args>(args)...);
-        type_index_ = static_cast<StorageIndexType>(TypeIndexV<Type, Ts...>);
+        new (reinterpret_cast<Type*>(data_)) Type(std::forward<Args>(args)...);
+        type_index_ =
+            static_cast<StorageIndexType>(detail::TypeIndexV<Type, Ts...>);
     }
 
     template <typename Fn>
-    decltype(auto) Visit(Fn &&fn) & {
+    decltype(auto) Visit(Fn&& fn) & {
         throw_if_invalid_index();
         return DoVisitImpl(std::forward<Fn>(fn), *this);
     }
 
     template <typename Fn>
-    decltype(auto) Visit(Fn &&fn) const & {
+    decltype(auto) Visit(Fn&& fn) const& {
         throw_if_invalid_index();
         return DoVisitImpl(std::forward<Fn>(fn), *this);
     }
 
     template <typename Fn>
-    decltype(auto) Visit(Fn &&fn) && {
+    decltype(auto) Visit(Fn&& fn) && {
         throw_if_invalid_index();
         return DoVisitImpl(std::forward<Fn>(fn), std::move(*this));
     }
 
     template <typename Fn>
-    decltype(auto) Visit(Fn &&fn) const && {
+    decltype(auto) Visit(Fn&& fn) const&& {
         throw_if_invalid_index();
         return DoVisitImpl(std::forward<Fn>(fn), std::move(*this));
     }
@@ -449,19 +444,19 @@ class Variant {
 };
 
 template <typename Visitor, typename V>
-decltype(auto) Visit(Visitor &&visitor, V &&v) {
+decltype(auto) Visit(Visitor&& visitor, V&& v) {
     static_assert(detail::IsVariantV<V>, "Must be a variant");
     return std::forward<V>(v).Visit(std::forward<Visitor>(visitor));
 }
 
 template <typename T, typename V>
-decltype(auto) HoldsAlternative(const V &v) {
+decltype(auto) HoldsAlternative(const V& v) {
     static_assert(detail::IsVariantV<V>, "Must be a variant");
     return v.template HoldsAlternative<T>();
 }
 
 template <typename T, typename V>
-decltype(auto) Get(V &&v) {
+decltype(auto) Get(V&& v) {
     static_assert(detail::IsVariantV<V>, "Must be a variant");
     return std::forward<V>(v).template Get<T>();
 }
