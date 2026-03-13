@@ -75,12 +75,12 @@ TEST(VariantTest, Monostate) {
     EXPECT_TRUE(v.HoldsAlternative<variant::Monostate>());
 }
 
-struct NonDefaultConstructible {
-    explicit NonDefaultConstructible(int) {}
-};
-
 TEST(VariantTest, NonDefaultConstructible) {
-    variant::Variant<NonDefaultConstructible, int> v;
+    struct NonDefaultConstructible {
+        explicit NonDefaultConstructible(int) {}
+    };
+
+    variant::Variant<variant::Monostate, NonDefaultConstructible, int> v;
     v.Emplace<int>(42);
     EXPECT_TRUE(v.HoldsAlternative<int>());
     v.Emplace<NonDefaultConstructible>(1);

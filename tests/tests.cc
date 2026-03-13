@@ -26,13 +26,13 @@ TEST(BasicVariantTests, ProperlyDestructingElements) {
     static int count = 0;
     struct Type {
         Type() { ++count; }
-        Type(const Type &) { ++count; }
-        Type(Type &&) noexcept { ++count; }
-        Type &operator=(const Type &) {
+        Type(const Type&) { ++count; }
+        Type(Type&&) noexcept { ++count; }
+        Type& operator=(const Type&) {
             ++count;
             return *this;
         }
-        Type &operator=(Type &&) noexcept {
+        Type& operator=(Type&&) noexcept {
             ++count;
             return *this;
         }

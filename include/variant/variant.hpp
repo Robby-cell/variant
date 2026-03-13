@@ -178,6 +178,11 @@ struct VisitImplStruct<void, Fn, Self, Ts...> {
                                   std::forward<Self>(self));
     }
 };
+
+template <class T, class...>
+struct FirstType {
+    using Type = T;
+};
 }  // namespace detail
 
 struct BadVariantAccess : public std::runtime_error {
@@ -320,7 +325,14 @@ class Variant {
     }
 
    public:
-    Variant() = default;
+    template <class = typename detail::FirstType<Ts...>::Type,
+              typename std::enable_if<
+                  std::is_default_constructible<
+                      typename detail::FirstType<Ts...>::Type>::value,
+                  int>::type = 0>
+    Variant() {
+        Emplace<typename detail::FirstType<Ts...>::Type>();
+    }
 
     ~Variant() { DoDestroy(); }
 
