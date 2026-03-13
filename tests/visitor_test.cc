@@ -1,18 +1,17 @@
 #include <gtest/gtest.h>
 
 #include <string>
+#include <utility>
 
 #include "variant/variant.hpp"
 
-// NOLINTBEGIN
-
-struct Visitor {
-    std::string operator()(int) { return "int"; }
-    std::string operator()(const std::string&) { return "string"; }
-    std::string operator()(double) { return "double"; }
-};
-
 TEST(VisitorTest, Basic) {
+    struct Visitor {
+        std::string operator()(int) { return "int"; }
+        std::string operator()(const std::string&) { return "string"; }
+        std::string operator()(double) { return "double"; }
+    };
+
     variant::Variant<int, std::string, double> v;
     v.Emplace<int>(42);
     EXPECT_EQ(v.Visit(Visitor{}), "int");
@@ -22,20 +21,23 @@ TEST(VisitorTest, Basic) {
     EXPECT_EQ(v.Visit(Visitor{}), "double");
 }
 
-struct ConstVisitor {
-    std::string operator()(int) const { return "int"; }
-    std::string operator()(const std::string&) const { return "string"; }
-    std::string operator()(double) const { return "double"; }
-};
-
 TEST(VisitorTest, Const) {
+    struct ConstVisitor {
+        std::string operator()(int) const { return "int"; }
+        std::string operator()(const std::string&) const { return "string"; }
+        std::string operator()(double) const { return "double"; }
+    };
+
     variant::Variant<int, std::string, double> v;
+
     v.Emplace<int>(42);
-    EXPECT_EQ(v.Visit(ConstVisitor{}), "int");
+    EXPECT_EQ(std::as_const(v).Visit(ConstVisitor{}), "int");
+
     v.Emplace<std::string>("hello");
-    EXPECT_EQ(v.Visit(ConstVisitor{}), "string");
+    EXPECT_EQ(std::as_const(v).Visit(ConstVisitor{}), "string");
+
     v.Emplace<double>(3.14);
-    EXPECT_EQ(v.Visit(ConstVisitor{}), "double");
+    EXPECT_EQ(std::as_const(v).Visit(ConstVisitor{}), "double");
 }
 
 TEST(VisitorTest, Overloaded) {
@@ -67,13 +69,14 @@ TEST(VisitorTest, ReturnType) {
 }
 
 TEST(VisitorTest, GlobalVisit) {
-    variant::Variant<int, std::string> v;
-    v.Emplace<int>(42);
-    struct V {
+    struct Visitor {
         std::string operator()(int) { return "int"; }
         std::string operator()(const std::string&) { return "string"; }
     };
-    EXPECT_EQ(variant::Visit(V{}, v), "int");
+
+    variant::Variant<int, std::string> v;
+    v.Emplace<int>(42);
+    EXPECT_EQ(variant::Visit(Visitor{}, v), "int");
 }
 
 TEST(VisitorTest, GlobalHoldsAlternative) {
@@ -82,5 +85,3 @@ TEST(VisitorTest, GlobalHoldsAlternative) {
     EXPECT_TRUE(variant::HoldsAlternative<int>(v));
     EXPECT_FALSE(variant::HoldsAlternative<std::string>(v));
 }
-
-// NOLINTEND
