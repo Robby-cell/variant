@@ -1,5 +1,5 @@
 ---
-Checks: '-*,readability-identifier-naming,google-*'
+Checks: "-*,readability-identifier-naming,google-*"
 
 CheckOptions:
   # ----------------------------------------------------------------------------
@@ -16,19 +16,19 @@ CheckOptions:
 
   readability-identifier-naming.FunctionCase: CamelCase
   readability-identifier-naming.MethodCase: CamelCase
-  
+
   # Enum constants are k diikuti oleh UpperCamelCase.
   readability-identifier-naming.EnumConstantCase: CamelCase
 
   # Constants (const, constexpr) are k followed by UpperCamelCase.
   readability-identifier-naming.ConstantCase: lower_case
   readability-identifier-naming.ConstexprVariableCase: CamelCase
-  
+
   # Member variables are lower_snake_case with a trailing underscore.
-  readability-identifier-naming.PrivateMemberCase: lower_case
-  readability-identifier-naming.PrivateMemberSuffix: '_'
-  readability-identifier-naming.ProtectedMemberCase: lower_case
-  readability-identifier-naming.ProtectedMemberSuffix: '_'
+  readability-identifier-naming.PrivateMemberCase: CamelCase
+  readability-identifier-naming.PrivateMemberPrefix: "m_"
+  readability-identifier-naming.ProtectedMemberCase: CamelCase
+  readability-identifier-naming.ProtectedMemberPrefix: "m_"
   # Public members don't have a trailing underscore.
   readability-identifier-naming.PublicMemberCase: lower_case
 
@@ -37,5 +37,5 @@ CheckOptions:
   readability-identifier-naming.ParameterCase: lower_case
 
   readability-identifier-naming.GlobalVariableCase: lower_case
-  readability-identifier-naming.GlobalVariablePrefix: 'g_'
+  readability-identifier-naming.GlobalVariablePrefix: "g_"
 ...

@@ -211,36 +211,36 @@ class Variant {
    public:
     template <std::size_t Index>
     TypeAtIndex<Index>& Get() & {
-        // Note: No type_index_ check here. The caller (Visit) is responsible.
-        return *reinterpret_cast<TypeAtIndex<Index>*>(&data_);
+        // Note: No m_TypeIndex check here. The caller (Visit) is responsible.
+        return *reinterpret_cast<TypeAtIndex<Index>*>(&m_Data);
     }
 
     template <std::size_t Index>
     const TypeAtIndex<Index>& Get() const& {
-        return *reinterpret_cast<const TypeAtIndex<Index>*>(&data_);
+        return *reinterpret_cast<const TypeAtIndex<Index>*>(&m_Data);
     }
 
     template <std::size_t Index>
     TypeAtIndex<Index>&& Get() && {
-        return std::move(*reinterpret_cast<TypeAtIndex<Index>*>(&data_));
+        return std::move(*reinterpret_cast<TypeAtIndex<Index>*>(&m_Data));
     }
 
     template <std::size_t Index>
     const TypeAtIndex<Index>&& Get() const&& {
-        return std::move(*reinterpret_cast<const TypeAtIndex<Index>*>(&data_));
+        return std::move(*reinterpret_cast<const TypeAtIndex<Index>*>(&m_Data));
     }
 
    private:
     template <typename T>
     void EnsureHoldsAlternative() const {
-        if (type_index_ != detail::IndexOfTypeV<T, Ts...>) {
+        if (m_TypeIndex != detail::IndexOfTypeV<T, Ts...>) {
             throw BadVariantAccess("Unexpected alternative active");
         }
     }
 
     template <std::size_t I>
     void EnsureHoldsAlternative() const {
-        if (type_index_ != I) {
+        if (m_TypeIndex != I) {
             throw BadVariantAccess("Unexpected alternative active");
         }
     }
@@ -310,7 +310,7 @@ class Variant {
         }
 
         Visit(DestroyInPlace{});
-        type_index_ = InvalidIndex;
+        m_TypeIndex = InvalidIndex;
     }
 
     void throw_if_invalid_index() const {  // NOLINT
@@ -383,14 +383,14 @@ class Variant {
     void Reset() { DoDestroy(); }
 
     constexpr bool HasInvalidIndex() const {
-        return type_index_ == InvalidIndex;
+        return m_TypeIndex == InvalidIndex;
     }
 
     template <typename T>
     constexpr bool HoldsAlternative() const {
         static_assert(detail::IsOneOfV<T, Ts...>,
                       "Must be one of the types belonging to the variant");
-        return type_index_ == detail::TypeIndexV<T, Ts...>;
+        return m_TypeIndex == detail::TypeIndexV<T, Ts...>;
     }
 
     template <typename T, typename... Args>
@@ -402,8 +402,8 @@ class Variant {
                       "Type must be constructible from the provided args");
 
         DoDestroy();
-        new (reinterpret_cast<Type*>(data_)) Type(std::forward<Args>(args)...);
-        type_index_ =
+        new (reinterpret_cast<Type*>(m_Data)) Type(std::forward<Args>(args)...);
+        m_TypeIndex =
             static_cast<StorageIndexType>(detail::TypeIndexV<Type, Ts...>);
     }
 
@@ -435,12 +435,12 @@ class Variant {
         if (HasInvalidIndex()) {
             return static_cast<std::size_t>(-1);
         }
-        return type_index_;
+        return m_TypeIndex;
     }
 
    private:
-    alignas(StorageAlign) Byte data_[StorageSize];
-    StorageIndexType type_index_ = InvalidIndex;
+    alignas(StorageAlign) Byte m_Data[StorageSize];
+    StorageIndexType m_TypeIndex = InvalidIndex;
 };
 
 template <typename Visitor, typename V>
