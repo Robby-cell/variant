@@ -183,6 +183,20 @@ template <class T, class...>
 struct FirstType {
     using Type = T;
 };
+
+template <class...>
+struct ConstructionArgs;
+
+template <class T, class = void, class... Ts>
+struct FirstConstructible;
+
+template <class... Args, class T, class... Ts>
+struct FirstConstructible<FirstConstructible<Args...>, T, Ts...> {
+    using Type = typename std::conditional<
+        std::is_constructible<T, Args...>::value, T,
+        typename FirstConstructible<ConstructionArgs<Args...>,
+                                    Ts...>::Type>::type;
+};
 }  // namespace detail
 
 struct BadVariantAccess : public std::runtime_error {
@@ -337,26 +351,34 @@ class Variant {
     ~Variant() { DoDestroy(); }
 
     template <typename T>
-    explicit Variant(T&& value) {
-        Emplace<typename detail::RemoveCVRef<T>::Type>(std::forward<T>(value));
+    Variant(T&& value) {
+        Emplace<typename detail::FirstConstructible<
+            detail::ConstructionArgs<T&&>, Ts...>::Type>(
+            std::forward<T>(value));
     }
 
     Variant(const Variant& that) { Copy(that); }
 
     Variant& operator=(const Variant& that) {
-        if (this == std::addressof(that)) {
-            return *this;
+        if (this != std::addressof(that)) {
+            Copy(that);
         }
-        Copy(that);
         return *this;
     }
     Variant(Variant&& that) noexcept { Take(std::move(that)); }
 
     Variant& operator=(Variant&& that) noexcept {
-        if (this == std::addressof(that)) {
-            return *this;
+        if (this != std::addressof(that)) {
+            Take(std::move(that));
         }
-        Take(std::move(that));
+        return *this;
+    }
+
+    template <class T>
+    Variant& operator=(T&& value) {
+        Emplace<typename detail::FirstConstructible<
+            detail::ConstructionArgs<T&&>, Ts...>::Type>(
+            std::forward<T>(value));
         return *this;
     }
 
