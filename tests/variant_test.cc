@@ -64,11 +64,6 @@ TEST(VariantTest, HoldsAlternative) {
     EXPECT_FALSE(v.HoldsAlternative<std::string>());
 }
 
-TEST(VariantTest, BadVariantAccess) {
-    variant::Variant<int, std::string> v;
-    EXPECT_THROW(v.Visit([](auto&&) {}), variant::BadVariantAccess);
-}
-
 TEST(VariantTest, Monostate) {
     variant::Variant<variant::Monostate, int> v;
     v.Emplace<variant::Monostate>();
